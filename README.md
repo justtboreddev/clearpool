@@ -5,6 +5,7 @@
 Built at NEAR HACKATHON 2026 · Tracks: Privacy & Private AI, Agent Economy, Unstoppable DeFi
 
 - Live app: https://clearpool.onrender.com
+- Usage manual: [MANUAL.md](MANUAL.md)
 - Contract (testnet): [`clearpool-bdb0ab.testnet`](https://testnet.nearblocks.io/address/clearpool-bdb0ab.testnet)
 
 ## The problem
