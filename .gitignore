@@ -1,0 +1,9 @@
+node_modules/
+.env
+.keys/
+build/pot_final.ptau
+build/withdraw.r1cs
+build/withdraw.sym
+contract/target/
+public/app.js
+.DS_Store

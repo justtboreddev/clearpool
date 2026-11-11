@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClearPool: private, clean money on NEAR</title>
+<meta name="description" content="A privacy pool on NEAR. Only approved funds can leave privately. Proofs run in your browser; the agent runs in a verified enclave.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%2300A62F'/><circle cx='16' cy='16' r='6' fill='%23F6F7F3'/></svg>">
+</head>
+<body>
+<header class="top">
+  <a class="logo" href="/">ClearPool<span class="dot"></span></a>
+  <div class="chips">
+    <span class="chip">NEAR testnet</span>
+    <button class="chip chip-btn" id="teeChip" type="button"><span class="led" id="teeLed"></span><span id="teeChipText">Agent enclave</span></button>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="eyebrow"><span class="dot"></span>Privacy pool on NEAR</p>
+    <h1>Send privately.<br><span class="g">Stay clean.</span></h1>
+    <p class="lede">Deposit 1 NEAR, withdraw to a fresh address. Only approved funds can leave privately.</p>
+  </section>
+
+  <section class="grid">
+    <div class="card main">
+      <nav class="tabs" role="tablist">
+        <button class="tab on" data-tab="deposit" role="tab">Deposit</button>
+        <button class="tab" data-tab="withdraw" role="tab">Withdraw</button>
+      </nav>
+
+      <!-- DEPOSIT -->
+      <div class="pane" id="pane-deposit">
+        <div class="amount"><span class="big">1</span><span class="unit">NEAR</span></div>
+        <p class="hint">Uses a demo testnet wallet. Your note is created in this browser.</p>
+        <button class="btn primary" id="depositBtn" type="button">Deposit 1 NEAR <span class="arr">→</span></button>
+        <label class="switch"><input type="checkbox" id="flaggedToggle"><span></span>Send from a flagged wallet (demo)</label>
+
+        <div class="note hidden" id="noteBox">
+          <div class="note-head"><strong>Your note</strong><span class="muted">The only key to this deposit</span></div>
+          <code id="noteText" class="mono"></code>
+          <div class="row">
+            <button class="btn ghost sm" id="copyNote" type="button">Copy</button>
+            <button class="btn ghost sm" id="saveNote" type="button">Download</button>
+            <button class="btn primary sm push" id="goWithdraw" type="button">Withdraw →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- WITHDRAW -->
+      <div class="pane hidden" id="pane-withdraw">
+        <label class="field"><span>Note</span>
+          <textarea id="noteIn" rows="3" spellcheck="false" placeholder="clearpool-1near-…"></textarea>
+        </label>
+        <div class="field"><span>Send to</span>
+          <div class="seg">
+            <button class="segb on" data-to="fresh" type="button">New address</button>
+            <button class="segb" data-to="account" type="button">Testnet account</button>
+          </div>
+          <input id="toAccount" class="hidden" placeholder="name.testnet" autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="agent" id="agentBox">
+          <div class="agent-head"><span class="avatar">A</span><strong>Privacy agent</strong><span class="tag" id="agentTag"></span></div>
+          <p id="agentText" class="agent-text">Paste a note and I'll check if now is a good time.</p>
+          <div class="agent-meta" id="agentMeta"></div>
+        </div>
+
+        <button class="btn primary" id="withdrawBtn" type="button">Withdraw privately <span class="arr">→</span></button>
+
+        <ol class="steps hidden" id="steps"></ol>
+
+        <div class="result hidden" id="result"></div>
+
+        <div class="bad hidden" id="badBox">
+          <strong>Not in the approved set</strong>
+          <p>This deposit can't leave privately. It can only go back to the wallet that sent it.</p>
+          <button class="btn danger sm" id="ragequitBtn" type="button">Return to sender</button>
+          <div id="rqResult" class="muted small"></div>
+        </div>
+
+        <details class="xchain" id="xchain">
+          <summary>Want it on another chain?</summary>
+          <div class="seg seg-sm">
+            <button class="segb on" data-chain="zec" type="button">ZEC</button>
+            <button class="segb" data-chain="usdc-base" type="button">USDC · Base</button>
+            <button class="segb" data-chain="sol" type="button">SOL</button>
+          </div>
+          <p class="quote" id="quoteText">…</p>
+          <p class="muted small">Live NEAR Intents quote for 1 NEAR (preview only, mainnet pricing).</p>
+        </details>
+      </div>
+    </div>
+
+    <aside class="card side">
+      <p class="eyebrow"><span class="dot"></span>Live pool</p>
+      <div class="stats">
+        <div><b id="sDeposits">–</b><span>deposits</span></div>
+        <div><b id="sApproved">–</b><span>approved</span></div>
+        <div><b id="sWithdrawals">–</b><span>withdrawn</span></div>
+      </div>
+      <div class="dots" id="dots" aria-label="Deposits in the pool"></div>
+      <p class="legend"><i class="d ok"></i>approved <i class="d no"></i>flagged <i class="d you"></i>yours</p>
+      <a class="small link" id="contractLink" target="_blank" rel="noopener">View contract ↗</a>
+    </aside>
+  </section>
+
+  <section class="how">
+    <div><b>1</b><p>Deposit a fixed amount. You get a secret note.</p></div>
+    <div><b>2</b><p>Your browser proves you own a clean deposit, without saying which.</p></div>
+    <div><b>3</b><p>Funds land at a new address. Flagged funds can only go back.</p></div>
+  </section>
+</main>
+
+<dialog id="teeDialog">
+  <form method="dialog">
+    <h3>Agent enclave check</h3>
+    <p class="muted small">Your browser made a random nonce. The model's hardware report must include it.</p>
+    <ul id="teeChecks" class="checks"></ul>
+    <p class="mono small" id="teeMeta"></p>
+    <button class="btn ghost sm" value="close">Close</button>
+  </form>
+</dialog>
+
+<footer><span>ClearPool · NEAR Hackathon 2026 · testnet only</span><a href="https://github.com/justtboreddev/clearpool" target="_blank" rel="noopener">Source ↗</a></footer>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
