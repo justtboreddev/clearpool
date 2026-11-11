@@ -18,7 +18,7 @@ const ASP = `cp-asp-${SUF}.testnet`;
 const HACKER = `cp-hacker-${SUF}.testnet`;
 const FUNDERS = ["alice", "d1", "d2", "d3"].map(n => `cp-${n}-${SUF}.testnet`);
 const FLAGGED = new Set([HACKER, ...(process.env.FLAGGED || "").split(",").filter(Boolean)]);
-const MODEL = process.env.NEARAI_MODEL || "z-ai/glm-5.3-flash";
+const MODEL = process.env.NEARAI_MODEL || "Qwen/Qwen3.8-27B";
 const NEARAI = "https://cloud-api.near.ai/v1";
 const PORT = process.env.PORT || 8080;
 const TGAS = 10n ** 12n;
@@ -138,14 +138,14 @@ const sha256hex = b => crypto.createHash("sha256").update(b).digest("hex");
 const SYSTEM = `You are ClearPool's privacy assistant, running inside a verified TEE.
 ClearPool is a privacy pool on NEAR: fixed 1 NEAR deposits, private withdrawals with a zero-knowledge proof, and only deposits in the approved (clean) set can withdraw privately.
 Answer in 1-3 short sentences, plain words, no markdown. Give a clear recommendation.
-Privacy rules you apply: more approved deposits after yours = better; withdrawing minutes after depositing links you by timing; never withdraw to an address you used before; the note is the only key to the funds.
+Rules, in order: if approved is false, say it cannot be withdrawn privately and can only go back to the sender. If depositsAfter is under 3, recommend waiting for more deposits (timing can link you). If minutesSinceDeposit is under 10, suggest waiting a bit longer. If freshRecipient is false, warn that sending to a known account weakens privacy. Otherwise say it's reasonable to withdraw now. Never invent pool numbers; only use the context given.
 You never ask for the user's note or secret.`;
 
 async function agentReply(question, ctx) {
   const key = process.env.NEARAI_API_KEY;
   if (!key) return { text: localAdvice(ctx), offline: true };
   if (!verifiedSigner || Date.now() - verifiedSigner.at > 30 * 60e3) await attest();
-  const body = JSON.stringify({ model: MODEL, max_tokens: 160, temperature: 0.3, messages: [
+  const body = JSON.stringify({ model: MODEL, max_tokens: 160, temperature: 0.2, chat_template_kwargs: { enable_thinking: false }, messages: [
     { role: "system", content: SYSTEM },
     { role: "user", content: `Pool context: ${JSON.stringify(ctx)}\nQuestion: ${String(question).slice(0, 400)}` },
   ] });
