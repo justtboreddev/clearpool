@@ -14,11 +14,7 @@
 <body>
 <header class="top">
   <a class="logo" href="/">ClearPool<span class="dot"></span></a>
-  <div class="chips">
-    <span class="chip">NEAR testnet</span>
-    <button class="chip chip-btn" id="walletChip" type="button">Connect wallet</button>
-    <button class="chip chip-btn" id="teeChip" type="button"><span class="led" id="teeLed"></span><span id="teeChipText">Agent enclave</span></button>
-  </div>
+  <button class="wallet-btn" id="walletChip" type="button">Connect wallet</button>
 </header>
 
 <main>
@@ -30,20 +26,21 @@
 
   <section class="grid">
     <div class="card main">
+      <div class="card-head">
       <nav class="tabs" role="tablist">
-        <button class="tab on" data-tab="deposit" role="tab">Deposit</button>
-        <button class="tab" data-tab="withdraw" role="tab">Withdraw</button>
-      </nav>
+          <button class="tab on" data-tab="deposit" role="tab">Deposit</button>
+          <button class="tab" data-tab="withdraw" role="tab">Withdraw</button>
+        </nav>
+        <div class="mode-card" role="group" aria-label="Mode">
+          <span class="ml" data-label="demo">Demo</span>
+          <button class="tgl" id="modeToggle" type="button" role="switch" aria-checked="false" aria-label="Use testnet with your own wallet"><span></span></button>
+          <span class="ml" data-label="mine">Testnet</span>
+        </div>
+      </div>
 
       <!-- DEPOSIT -->
       <div class="pane" id="pane-deposit">
         <div class="amount"><span class="big">1</span><span class="unit">NEAR</span></div>
-        <div class="field"><span>Pay from</span>
-          <div class="seg">
-            <button class="segb on" data-from="demo" type="button">Demo wallet</button>
-            <button class="segb" data-from="mine" type="button">My wallet</button>
-          </div>
-        </div>
         <p class="hint" id="fromHint">No wallet needed. Your note is created in this browser.</p>
         <button class="btn primary" id="depositBtn" type="button">Deposit 1 NEAR <span class="arr">→</span></button>
         <label class="switch" id="flaggedRow"><input type="checkbox" id="flaggedToggle"><span></span>Send from a flagged wallet (demo)</label>
@@ -144,7 +141,16 @@
   </form>
 </dialog>
 
-<footer><span>ClearPool · NEAR Hackathon 2026 · testnet only</span><a href="https://github.com/justtboreddev/clearpool" target="_blank" rel="noopener">Source ↗</a></footer>
+<footer class="strip" aria-label="Status">
+  <span class="si"><span class="led ok"></span>Live</span>
+  <span class="si">NEAR testnet</span>
+  <button class="si si-btn" id="teeChip" type="button"><span class="led" id="teeLed"></span><span id="teeChipText">Agent enclave</span></button>
+  <span class="si si-last" id="netSpeed" title="Final block height and average block time on NEAR testnet"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span id="netText">Connecting…</span></span>
+  <span class="si-grow"></span>
+  <a class="si si-link" id="contractLink2" target="_blank" rel="noopener">Contract</a>
+  <a class="si si-link" href="https://github.com/justtboreddev/clearpool/blob/main/MANUAL.md" target="_blank" rel="noopener">Manual</a>
+  <a class="si si-link" href="https://github.com/justtboreddev/clearpool" target="_blank" rel="noopener">GitHub</a>
+</footer>
 <script type="module" src="/app.js"></script>
 </body>
 </html>

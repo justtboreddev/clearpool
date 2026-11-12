@@ -10,7 +10,7 @@ Live app: https://clearpool.onrender.com · Network: **NEAR testnet** (no real m
 
 - Any modern browser (Chrome, Safari, Firefox, Edge), desktop or phone.
 - **Your own wallet (normal use):** a NEAR testnet wallet: Meteor, HERE or Intear. Get free test NEAR at https://near-faucet.io.
-- **No wallet?** Pick **Demo wallet** and the app deposits from a demo testnet wallet so you can try it straight away.
+- **No wallet?** Switch the card to **Demo** and the app deposits from a demo testnet wallet so you can try it straight away.
 - First visit can take up to a minute while the free server wakes up.
 
 ---
@@ -18,8 +18,8 @@ Live app: https://clearpool.onrender.com · Network: **NEAR testnet** (no real m
 ## 1. Deposit
 
 1. Open the **Deposit** tab.
-2. Under **Pay from**, pick **My wallet** (or **Demo wallet** to try without one).
-3. With **My wallet**, click **Connect wallet** and choose Meteor, HERE or Intear. Your account shows in the header.
+2. Use the **Demo / Testnet** toggle at the top of the card. **Testnet** uses your own wallet; **Demo** pays from a demo wallet so you can try it without one.
+3. On **Testnet**, click **Connect wallet** and choose Meteor, HERE or Intear. Your account shows in the header.
 4. Click **Deposit 1 NEAR**. With your own wallet, approve the transaction (1 NEAR + a little gas) in the wallet.
 5. Wait a few seconds. The button changes to **Deposited · view tx ↗** (opens the transaction on NearBlocks).
 6. A green box appears with **Your note**.
@@ -68,7 +68,7 @@ Import the private key into a NEAR wallet that supports testnet and private-key 
 
 ## 4. If your deposit is flagged
 
-To see this, switch on **Send from a flagged wallet (demo)** on the Deposit tab before depositing.
+To see this, set the card to **Demo** and switch on **Send from a flagged wallet (demo)** on the Deposit tab before depositing.
 
 When you try to withdraw a flagged deposit:
 - The step shows **Not in the approved set**.
@@ -82,7 +82,7 @@ This is the point of ClearPool: honest money gets privacy, flagged money can onl
 
 ## 5. Check the enclave yourself
 
-Click **Enclave verified** in the top-right corner. Your browser makes a random number (a nonce), and the AI model's hardware report has to include it. You'll see four checks:
+Click **Enclave verified** in the status bar at the bottom of the page. Your browser makes a random number (a nonce), and the AI model's hardware report has to include it. You'll see four checks:
 
 | Check | Meaning |
 |---|---|
@@ -112,6 +112,7 @@ This is a **preview only**. NEAR Intents runs on mainnet, and ClearPool is on te
 | Red dot | Flagged deposit |
 | Black dot | Your deposit (remembered in this browser only) |
 | View contract ↗ | The ClearPool contract on NearBlocks |
+| Bottom status bar | Live status, enclave check, latest NEAR block, average block time and RPC response time |
 
 ---
 

@@ -33,6 +33,7 @@ async function refresh() {
     $("sApproved").textContent = state.approvedLeaves.length;
     $("sWithdrawals").textContent = state.stats.withdrawals + state.stats.ragequits;
     $("contractLink").href = `${EXPLORER}/address/${state.contract}`;
+    $("contractLink2").href = $("contractLink").href;
     const dots = $("dots"), have = dots.children.length;
     state.deposits.slice(have).forEach(d => {
       const i = document.createElement("i");
@@ -104,17 +105,20 @@ const friendly = e => {
 };
 
 // ---------- wallet ----------
-let fromMode = "demo";
+let fromMode = store.get("cp_mode") === "mine" ? "mine" : "demo";
 function setFrom(m) {
-  fromMode = m;
-  document.querySelectorAll("[data-from]").forEach(x => x.classList.toggle("on", x.dataset.from === m));
+  fromMode = m; store.set("cp_mode", m);
+  $("modeToggle").setAttribute("aria-checked", String(m === "mine"));
+  document.querySelectorAll("[data-label]").forEach(x => x.classList.toggle("on", x.dataset.label === m));
   $("flaggedRow").classList.toggle("hidden", m !== "demo");
   if (m !== "demo") $("flaggedToggle").checked = false;
-  $("fromHint").innerHTML = m === "demo" ? "No wallet needed. Your note is created in this browser."
+  $("fromHint").innerHTML = m === "demo" ? "Pays from a demo testnet wallet. No wallet needed."
     : wallet.account ? `From <b>${esc(wallet.account)}</b> · <a href="#" id="signOut" class="link">disconnect</a>` : "Connect a NEAR testnet wallet. Free test NEAR at <a class=\"link\" href=\"https://near-faucet.io\" target=\"_blank\" rel=\"noopener\">near-faucet.io</a>.";
   const so = $("signOut"); if (so) so.onclick = e => { e.preventDefault(); signOut(); };
 }
-document.querySelectorAll("[data-from]").forEach(b => b.onclick = () => { setFrom(b.dataset.from); if (b.dataset.from === "mine" && !wallet.account) openWallets(); });
+const pickMode = m => { setFrom(m); if (m === "mine" && !wallet.account) openWallets(); };
+$("modeToggle").onclick = () => pickMode(fromMode === "mine" ? "demo" : "mine");
+document.querySelectorAll("[data-label]").forEach(x => x.onclick = () => pickMode(x.dataset.label));
 
 const wallet = { selector: null, account: null };
 const contractId = fetch("/api/state").then(r => r.json()).then(j => j.contract);
@@ -132,8 +136,7 @@ function paintWallet() {
   const chip = $("walletChip");
   chip.textContent = wallet.account ? (wallet.account.length > 22 ? wallet.account.slice(0, 8) + "…" + wallet.account.slice(-6) : wallet.account) : "Connect wallet";
   chip.classList.toggle("on", !!wallet.account);
-  if (wallet.account && fromMode === "demo" && !paintWallet.done) { paintWallet.done = true; setFrom("mine"); }
-  else setFrom(fromMode);
+  setFrom(fromMode);
 }
 async function openWallets() {
   const list = $("walletList"); $("walletErr").textContent = "";
@@ -157,7 +160,7 @@ async function openWallets() {
   }
 }
 async function signOut() { try { const w = await wallet.selector.wallet(); await w.signOut(); } catch {} wallet.account = null; paintWallet(); }
-$("walletChip").onclick = () => wallet.account ? (tab("deposit"), setFrom("mine")) : openWallets();
+$("walletChip").onclick = () => { setFrom("mine"); wallet.account ? tab("deposit") : openWallets(); };
 const NEAR1 = 10n ** 24n, TGAS = 10n ** 12n;
 async function walletCall(methodName, args, deposit) {
   const sel = await selectorReady, w = await sel.wallet();
@@ -326,3 +329,21 @@ async function attest(open) {
 }
 $("teeChip").onclick = () => { $("teeDialog").showModal(); attest(false); };
 attest(false);
+
+// ---------- network speed (status strip) ----------
+const RPC = "https://test.rpc.fastnear.com";
+const rpc = async (method, params) => (await (await fetch(RPC, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) })).json()).result;
+let netPrev = null;
+async function netTick() {
+  try {
+    const t0 = performance.now();
+    const b = (await rpc("block", { finality: "final" })).header;
+    const ping = Math.round(performance.now() - t0);
+    if (!netPrev) { const old = (await rpc("block", { block_id: b.height - 20 }))?.header; netPrev = old || b; }
+    const dh = b.height - netPrev.height, dt = (Number(b.timestamp) - Number(netPrev.timestamp)) / 1e9;
+    const bt = dh > 0 ? dt / dh : null;
+    $("netText").textContent = `#${b.height.toLocaleString("en-US")}${bt ? ` · ${bt.toFixed(2)}s blocks` : ""} · ${ping}ms`;
+    if (dh > 0) netPrev = b;
+  } catch { $("netText").textContent = "RPC unreachable"; }
+}
+netTick(); setInterval(netTick, 6000);

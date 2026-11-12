@@ -29,12 +29,12 @@ Open the live app.
 
 | Do | See |
 |---|---|
-| Click **Deposit 1 NEAR** (Pay from: Demo wallet, no wallet needed) | A tx link, your note, and a new black dot ("yours") in *Live pool* |
-| Or pick **My wallet**, connect a testnet wallet, deposit | Your wallet asks to approve `deposit` with 1 NEAR on the contract |
+| With the card toggle on **Demo** (default, no wallet needed), click **Deposit 1 NEAR** | A tx link, your note, and a new black dot ("yours") in *Live pool* |
+| Or flip the toggle to **Testnet**, connect a testnet wallet, deposit | Your wallet asks to approve `deposit` with 1 NEAR on the contract |
 | Click **Withdraw →**, then **Withdraw privately** | "Proof built in ~1s", then "1 NEAR sent privately" to a brand-new 64-hex address with its private key. The explorer shows the payout came from the contract, not from your deposit wallet |
 | Click **Withdraw privately** again with the same note | Fails with `note already spent` |
 | On **Deposit**, switch on **Send from a flagged wallet**, deposit, then try to withdraw | "Not in the approved set". **Return to sender** refunds only the original wallet |
-| Click **Enclave verified** in the header | 4 checks: Intel TDX quote signature, your nonce inside the quote, model signing key inside the quote, NVIDIA GPU evidence |
+| Click **Enclave verified** in the bottom status bar | 4 checks: Intel TDX quote signature, your nonce inside the quote, model signing key inside the quote, NVIDIA GPU evidence |
 | Open **Want it on another chain?** | A live NEAR Intents dry quote for 1 NEAR → ZEC / USDC on Base / SOL |
 
 Scripted end-to-end check against the live deployment (no keys needed, only Node 20+):
