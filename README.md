@@ -14,7 +14,7 @@ On a public chain anyone you pay can see your whole history, and anyone who pays
 
 ## What ClearPool does
 
-1. You deposit a fixed 1 NEAR. Your browser creates a secret **note**. Only a hash of it goes on-chain.
+1. You deposit a fixed 1 NEAR from your own NEAR wallet (Meteor, HERE, Intear via wallet-selector) or a demo wallet. Your browser creates a secret **note**. Only a hash of it goes on-chain.
 2. To withdraw, your browser builds a **zero-knowledge proof** that you own *some* deposit in the pool **and** that the deposit is in the **approved set**, without revealing which one.
 3. The contract verifies the proof on-chain and pays a **fresh address**. A relayer submits the transaction, so the new address needs no gas.
 4. Deposits that aren't approved (e.g. from a flagged wallet) **can't** withdraw privately. They can only `ragequit`: a public refund to the wallet that sent them.
@@ -29,7 +29,8 @@ Open the live app.
 
 | Do | See |
 |---|---|
-| Click **Deposit 1 NEAR** | A tx link, your note, and a new black dot ("yours") in *Live pool* |
+| Click **Deposit 1 NEAR** (Pay from: Demo wallet, no wallet needed) | A tx link, your note, and a new black dot ("yours") in *Live pool* |
+| Or pick **My wallet**, connect a testnet wallet, deposit | Your wallet asks to approve `deposit` with 1 NEAR on the contract |
 | Click **Withdraw →**, then **Withdraw privately** | "Proof built in ~1s", then "1 NEAR sent privately" to a brand-new 64-hex address with its private key. The explorer shows the payout came from the contract, not from your deposit wallet |
 | Click **Withdraw privately** again with the same note | Fails with `note already spent` |
 | On **Deposit**, switch on **Send from a flagged wallet**, deposit, then try to withdraw | "Not in the approved set". **Return to sender** refunds only the original wallet |
@@ -43,7 +44,9 @@ npm ci
 node scripts/e2e.js https://clearpool.onrender.com
 ```
 
-It runs a deposit, a private withdrawal to a fresh address (and checks its balance), a double-spend attempt, a flagged deposit, a forged approved-set attack, a ragequit, attestation, the agent and a quote. Each line prints ✓ results or the on-chain error.
+`node scripts/e2e-wallet.js <base> <your-account.testnet>` runs the own-wallet path (deposit signed by your account, private withdraw, ragequit by the depositor); it needs that account's key in `.keys/` or `KEY_*`.
+
+`e2e.js` runs a deposit, a private withdrawal to a fresh address (and checks its balance), a double-spend attempt, a flagged deposit, a forged approved-set attack, a ragequit, attestation, the agent and a quote. Each line prints ✓ results or the on-chain error.
 
 ## How it works
 
@@ -90,7 +93,7 @@ Scripts: `scripts/create-account.js` (faucet-funded testnet accounts), `scripts/
 - **Testnet only.** NEAR Intents has no testnet, so the cross-chain step is a live *quote* (dry run), not an executed swap.
 - **Trusted setup** was a single-party ceremony made for this hackathon. Production needs a multi-party ceremony.
 - **The ASP rule is a demo blocklist** (one flagged wallet). A real ASP would use chain-analysis signals and publish its policy.
-- **Deposits use demo wallets** so judges can try it without a testnet wallet. A wallet-selector deposit is the obvious next step.
+- **Demo wallets** remain as an option so judges can try it without a testnet wallet. MyNearWallet is retired and no longer connects to apps, so it isn't offered.
 - **Quote verification runs on the server** with a nonce from your browser. The browser can't call the verifier's collateral service directly yet.
 - If the NEAR AI Cloud key is missing or invalid, the agent falls back to built-in rules and the UI says so ("Offline rules").
 

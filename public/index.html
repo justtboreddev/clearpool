@@ -16,6 +16,7 @@
   <a class="logo" href="/">ClearPool<span class="dot"></span></a>
   <div class="chips">
     <span class="chip">NEAR testnet</span>
+    <button class="chip chip-btn" id="walletChip" type="button">Connect wallet</button>
     <button class="chip chip-btn" id="teeChip" type="button"><span class="led" id="teeLed"></span><span id="teeChipText">Agent enclave</span></button>
   </div>
 </header>
@@ -37,9 +38,15 @@
       <!-- DEPOSIT -->
       <div class="pane" id="pane-deposit">
         <div class="amount"><span class="big">1</span><span class="unit">NEAR</span></div>
-        <p class="hint">Uses a demo testnet wallet. Your note is created in this browser.</p>
+        <div class="field"><span>Pay from</span>
+          <div class="seg">
+            <button class="segb on" data-from="demo" type="button">Demo wallet</button>
+            <button class="segb" data-from="mine" type="button">My wallet</button>
+          </div>
+        </div>
+        <p class="hint" id="fromHint">No wallet needed. Your note is created in this browser.</p>
         <button class="btn primary" id="depositBtn" type="button">Deposit 1 NEAR <span class="arr">→</span></button>
-        <label class="switch"><input type="checkbox" id="flaggedToggle"><span></span>Send from a flagged wallet (demo)</label>
+        <label class="switch" id="flaggedRow"><input type="checkbox" id="flaggedToggle"><span></span>Send from a flagged wallet (demo)</label>
 
         <div class="note hidden" id="noteBox">
           <div class="note-head"><strong>Your note</strong><span class="muted">The only key to this deposit</span></div>
@@ -116,6 +123,16 @@
     <div><b>3</b><p>Funds land at a new address. Flagged funds can only go back.</p></div>
   </section>
 </main>
+
+<dialog id="walletDialog">
+  <form method="dialog">
+    <h3>Connect a NEAR wallet</h3>
+    <p class="muted small">Testnet. Get free test NEAR at <a href="https://near-faucet.io" target="_blank" rel="noopener">near-faucet.io</a>.</p>
+    <ul id="walletList" class="wallets"></ul>
+    <p class="muted small" id="walletErr"></p>
+    <button class="btn ghost sm" value="close">Close</button>
+  </form>
+</dialog>
 
 <dialog id="teeDialog">
   <form method="dialog">

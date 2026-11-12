@@ -9,7 +9,8 @@ Live app: https://clearpool.onrender.com · Network: **NEAR testnet** (no real m
 ## Before you start
 
 - Any modern browser (Chrome, Safari, Firefox, Edge), desktop or phone.
-- No wallet needed. The app deposits from demo testnet wallets so you can try it straight away.
+- **Your own wallet (normal use):** a NEAR testnet wallet: Meteor, HERE or Intear. Get free test NEAR at https://near-faucet.io.
+- **No wallet?** Pick **Demo wallet** and the app deposits from a demo testnet wallet so you can try it straight away.
 - First visit can take up to a minute while the free server wakes up.
 
 ---
@@ -17,9 +18,11 @@ Live app: https://clearpool.onrender.com · Network: **NEAR testnet** (no real m
 ## 1. Deposit
 
 1. Open the **Deposit** tab.
-2. Click **Deposit 1 NEAR**.
-3. Wait a few seconds. The button changes to **Deposited · view tx ↗** (opens the transaction on NearBlocks).
-4. A green box appears with **Your note**.
+2. Under **Pay from**, pick **My wallet** (or **Demo wallet** to try without one).
+3. With **My wallet**, click **Connect wallet** and choose Meteor, HERE or Intear. Your account shows in the header.
+4. Click **Deposit 1 NEAR**. With your own wallet, approve the transaction (1 NEAR + a little gas) in the wallet.
+5. Wait a few seconds. The button changes to **Deposited · view tx ↗** (opens the transaction on NearBlocks).
+6. A green box appears with **Your note**.
 
 **Save your note.** It's the only key to your deposit. Use **Copy** or **Download**. Lose it and the 1 NEAR is gone for good. Anyone who has it can take the money.
 
@@ -59,7 +62,7 @@ The agent never sees your note. It only gets rough numbers: pool size, roughly h
 **Save that private key.** It's the only way to use the 1 NEAR at the new address.
 
 ### Using the funds at the new address
-Import the private key into a NEAR wallet that supports testnet and private-key import (for example MyNearWallet on testnet: *Import account → Private key*). The 64-character address is a NEAR "implicit account", so it works like any other account once imported.
+Import the private key into a NEAR wallet that supports testnet and private-key import (for example Meteor Wallet: *Add wallet → Import with private key*, network set to testnet). The 64-character address is a NEAR "implicit account", so it works like any other account once imported.
 
 ---
 
@@ -71,6 +74,7 @@ When you try to withdraw a flagged deposit:
 - The step shows **Not in the approved set**.
 - A red box explains it can't leave privately.
 - **Return to sender** sends the 1 NEAR back to the wallet it came from, and only that wallet. This refund is public.
+- If you deposited from your own wallet, connect that same wallet first: it signs the refund.
 
 This is the point of ClearPool: honest money gets privacy, flagged money can only go back where it came from.
 
@@ -122,13 +126,16 @@ This is a **preview only**. NEAR Intents runs on mainnet, and ClearPool is on te
 | "Not in the approved set" | The deposit came from a flagged wallet. Use **Return to sender** |
 | "Slow down a little" | You hit the demo limit (12 deposits an hour). Try again later |
 | "The flagged demo wallet is out of test funds" | The demo flagged wallet is empty. Try again later |
+| "Not enough testnet NEAR" | Get free test NEAR at https://near-faucet.io |
+| "You cancelled in the wallet" | Nothing was sent. Click **Deposit 1 NEAR** again |
+| "Connect …, the wallet that made this deposit" | Refunds go only to the depositor; connect that wallet |
 | Proof step is slow on a phone | Older phones take longer. Leave the page open until it finishes |
 
 ---
 
 ## FAQ
 
-**Is this real money?** No. Everything runs on NEAR testnet.
+**Is this real money?** No. Everything runs on NEAR testnet. The hackathon allows testnet-only projects (rules Q-010).
 
 **What does the server know?** It relays your withdrawal, so it sees the address you're sending to. It never sees your note and can't tell which deposit you're spending; the proof hides that.
 

@@ -1,0 +1,31 @@
+// "Normal user" flow: a user's own testnet account deposits by signing the same tx the wallet sends,
+// then withdraws privately through the relayer, then a second deposit is refunded with ragequit by the same account.
+import * as C from "../lib/core.js";
+import * as snarkjs from "snarkjs";
+import { KeyPair } from "near-api-js";
+import { account, provider, NEAR } from "../lib/near.js";
+const [B, USER] = [process.argv[2] || "http://localhost:8090", process.argv[3]];
+const j = async (p, b) => { const r = await fetch(B + p, b ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) } : {}); const x = await r.json(); if (!r.ok) throw new Error(x.error); return x; };
+await C.init();
+const st0 = await j("/api/state"), CONTRACT = st0.contract, me = account(USER);
+const bal = async id => Number(BigInt((await provider.viewAccount({ accountId: id })).amount)) / 1e24;
+const deposit = async n => (await me.callFunctionRaw({ contractId: CONTRACT, methodName: "deposit", args: { commitment: n.commitment.toString() }, gas: 100n * 10n ** 12n, deposit: NEAR(1) })).transaction.hash;
+const waitApproved = async c => { for (let i = 0; i < 15; i++) { const s = await j("/api/state"); if (s.approvedLeaves.includes(c)) return s; await new Promise(r => setTimeout(r, 3000)); } throw new Error("not approved in time"); };
+console.log("user", USER, "balance", (await bal(USER)).toFixed(3));
+const note = C.makeNote();
+console.log("1 wallet deposit tx", await deposit(note));
+const st = await waitApproved(note.commitment.toString());
+const d = st.deposits[st.poolLeaves.indexOf(note.commitment.toString())];
+console.log("2 approved by ASP, depositor shown as", d.depositor, "flagged", d.flagged);
+const fresh = Buffer.from(KeyPair.fromRandom("ed25519").getPublicKey().data).toString("hex");
+const input = await C.witnessInput(note, st.poolLeaves, st.approvedLeaves, fresh);
+const { proof } = await snarkjs.groth16.fullProve(input, "build/withdraw_js/withdraw.wasm", "build/withdraw.zkey");
+const w = await j("/api/relay", { proof, root: input.root, asp_root: input.aspRoot, nullifier_hash: input.nullifierHash, recipient: fresh });
+console.log("3 private withdraw tx", w.tx, "fresh balance", await bal(fresh));
+const n2 = C.makeNote();
+console.log("4 second deposit tx", await deposit(n2));
+await waitApproved(n2.commitment.toString());
+const before = await bal(USER);
+const rq = await me.callFunctionRaw({ contractId: CONTRACT, methodName: "ragequit", args: { nullifier: n2.nullifier.toString(), secret: n2.secret.toString() }, gas: 100n * 10n ** 12n, deposit: 0n });
+console.log("5 ragequit by depositor tx", rq.transaction.hash, "balance change", (await bal(USER) - before).toFixed(3));
+process.exit(0);

@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "esbuild src/app.js --bundle --format=esm --platform=browser --minify --outfile=public/app.js --inject:src/shims.js --define:process.env.NODE_DEBUG=false --define:global=globalThis --external:fs --external:readline --external:os --external:crypto --external:path --external:url --external:worker_threads --external:constants --external:module",
+    "build": "esbuild src/app.js --bundle --format=esm --platform=browser --minify --outfile=public/app.js --inject:src/shims.js --define:process.env.NODE_DEBUG=false --define:global=globalThis --external:fs --external:readline --external:os --alias:crypto=./src/crypto-shim.js --external:path --external:url --external:worker_threads --external:constants --external:module",
     "start": "node server.js",
     "test": "node scripts/e2e.js"
   },
@@ -13,6 +13,11 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@near-wallet-selector/core": "^10.1.4",
+    "@near-wallet-selector/here-wallet": "^10.1.4",
+    "@near-wallet-selector/intear-wallet": "^10.1.4",
+    "@near-wallet-selector/meteor-wallet": "^10.1.4",
+    "@near-wallet-selector/my-near-wallet": "^10.1.4",
     "@phala/dcap-qvl": "^0.7.1",
     "assert": "^2.1.0",
     "buffer": "^6.0.3",

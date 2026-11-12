@@ -160,3 +160,10 @@ footer a { color: var(--muted); }
   .chip:first-child { display: none; }
   .card { padding: 18px; }
 }
+
+.wallets { list-style: none; padding: 0; margin: 14px 0; display: grid; gap: 8px; }
+.wallets button { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; text-align: left; }
+.wallets button:hover { border-color: var(--ink); }
+.wallets img { width: 28px; height: 28px; border-radius: 8px; }
+.wallets small { margin-left: auto; color: var(--muted); font-weight: 600; }
+.chip-btn.on { color: var(--ink); }

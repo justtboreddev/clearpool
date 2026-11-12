@@ -206,7 +206,7 @@ app.get("/api/state", async (req, res) => {
     res.json({
       network: "testnet", contract: CONTRACT, asp: ASP, denomination: "1", stats, poolRoot, aspRoot,
       poolLeaves: deposits.map(d => d.commitment), approvedLeaves: approved,
-      deposits: deposits.map(d => ({ index: d.index, ts: d.ts, approved: !FLAGGED.has(d.depositor), flagged: FLAGGED.has(d.depositor) })),
+      deposits: deposits.map(d => ({ index: d.index, ts: d.ts, depositor: d.depositor, approved: !FLAGGED.has(d.depositor), flagged: FLAGGED.has(d.depositor) })),
       agent: !!process.env.NEARAI_API_KEY, model: MODEL,
     });
   } catch (e) { res.status(500).json({ error: friendly(e) }); }

@@ -2,6 +2,10 @@
 import * as C from "../lib/core.js";
 import * as snarkjs from "snarkjs";
 import { KeyPair } from "near-api-js";
+import { setupWalletSelector, actionCreators } from "@near-wallet-selector/core";
+import { setupMeteorWallet } from "@near-wallet-selector/meteor-wallet";
+import { setupHereWallet } from "@near-wallet-selector/here-wallet";
+import { setupIntearWallet } from "@near-wallet-selector/intear-wallet";
 
 const $ = id => document.getElementById(id);
 const EXPLORER = "https://testnet.nearblocks.io";
@@ -51,28 +55,124 @@ function tab(name) {
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => tab(t.dataset.tab));
 
 // ---------- deposit ----------
+const DEP_LABEL = 'Deposit 1 NEAR <span class="arr">→</span>';
+function showDeposited(text, commitment, tx) {
+  myCommitments.add(commitment); store.set("cp_mine", JSON.stringify([...myCommitments]));
+  store.set("cp_last_note", text);
+  const box = $("noteBox");
+  if (!box.querySelector("#noteText")) location.reload(); // box was replaced by an error message
+  $("noteText").textContent = text;
+  box.classList.remove("hidden");
+  $("noteIn").value = text;
+  const btn = $("depositBtn");
+  btn.disabled = true;
+  btn.innerHTML = `Deposited · <a href="${EXPLORER}/txns/${esc(tx)}" target="_blank" rel="noopener" style="color:#fff">view tx ↗</a>`;
+  setTimeout(() => { btn.disabled = false; btn.innerHTML = DEP_LABEL; }, 4000);
+  refresh();
+}
 $("depositBtn").onclick = async () => {
-  const btn = $("depositBtn"), flagged = $("flaggedToggle").checked;
+  const btn = $("depositBtn");
+  if (fromMode === "mine" && !wallet.account) return openWallets();
   btn.disabled = true; btn.textContent = "Creating note…";
   try {
     await ready;
     const note = C.makeNote();
-    const text = C.noteToString(note, "1near");
-    btn.textContent = "Depositing on NEAR…";
-    const r = await api("/api/demo/deposit", { commitment: note.commitment.toString(), flagged });
-    myCommitments.add(note.commitment.toString()); store.set("cp_mine", JSON.stringify([...myCommitments]));
-    store.set("cp_last_note", text);
-    $("noteText").textContent = text;
-    $("noteBox").classList.remove("hidden");
-    $("noteIn").value = text;
-    btn.innerHTML = `Deposited · <a href="${EXPLORER}/txns/${esc(r.tx)}" target="_blank" rel="noopener" style="color:#fff">view tx ↗</a>`;
-    setTimeout(() => { btn.disabled = false; btn.innerHTML = 'Deposit 1 NEAR <span class="arr">→</span>'; }, 4000);
-    refresh();
+    const text = C.noteToString(note, "1near"), commitment = note.commitment.toString();
+    if (fromMode === "mine") {
+      // saved before signing: redirect wallets leave this page and come back
+      store.set("cp_pending", JSON.stringify({ text, commitment }));
+      btn.textContent = "Confirm in your wallet…";
+      const out = await walletDeposit(commitment);
+      if (!out) return; // redirect wallet: finished on return
+      store.set("cp_pending", "");
+      showDeposited(text, commitment, out.transaction?.hash || out.transaction_outcome?.id);
+    } else {
+      btn.textContent = "Depositing on NEAR…";
+      const r = await api("/api/demo/deposit", { commitment, flagged: $("flaggedToggle").checked });
+      showDeposited(text, commitment, r.tx);
+    }
   } catch (e) {
-    btn.disabled = false; btn.innerHTML = 'Deposit 1 NEAR <span class="arr">→</span>';
-    alertInline($("noteBox"), e.message);
+    btn.disabled = false; btn.innerHTML = DEP_LABEL;
+    alertInline($("noteBox"), friendly(e));
   }
 };
+const friendly = e => {
+  const m = String(e?.message || e);
+  if (/reject|cancel|denied|closed/i.test(m)) return "You cancelled in the wallet. Nothing was sent.";
+  if (/NotEnoughBalance|not enough balance|LackBalance/i.test(m)) return "Not enough testnet NEAR. Get some free at near-faucet.io.";
+  return m;
+};
+
+// ---------- wallet ----------
+let fromMode = "demo";
+function setFrom(m) {
+  fromMode = m;
+  document.querySelectorAll("[data-from]").forEach(x => x.classList.toggle("on", x.dataset.from === m));
+  $("flaggedRow").classList.toggle("hidden", m !== "demo");
+  if (m !== "demo") $("flaggedToggle").checked = false;
+  $("fromHint").innerHTML = m === "demo" ? "No wallet needed. Your note is created in this browser."
+    : wallet.account ? `From <b>${esc(wallet.account)}</b> · <a href="#" id="signOut" class="link">disconnect</a>` : "Connect a NEAR testnet wallet. Free test NEAR at <a class=\"link\" href=\"https://near-faucet.io\" target=\"_blank\" rel=\"noopener\">near-faucet.io</a>.";
+  const so = $("signOut"); if (so) so.onclick = e => { e.preventDefault(); signOut(); };
+}
+document.querySelectorAll("[data-from]").forEach(b => b.onclick = () => { setFrom(b.dataset.from); if (b.dataset.from === "mine" && !wallet.account) openWallets(); });
+
+const wallet = { selector: null, account: null };
+const contractId = fetch("/api/state").then(r => r.json()).then(j => j.contract);
+const selectorReady = contractId.then(id => setupWalletSelector({
+  network: "testnet",
+  modules: [setupMeteorWallet(), setupHereWallet(), setupIntearWallet()],
+})).then(async sel => {
+  wallet.selector = sel;
+  const sync = st => { wallet.account = st.accounts.find(a => a.active)?.accountId || st.accounts[0]?.accountId || null; paintWallet(); };
+  sync(sel.store.getState());
+  sel.store.observable.subscribe(sync);
+  return sel;
+});
+function paintWallet() {
+  const chip = $("walletChip");
+  chip.textContent = wallet.account ? (wallet.account.length > 22 ? wallet.account.slice(0, 8) + "…" + wallet.account.slice(-6) : wallet.account) : "Connect wallet";
+  chip.classList.toggle("on", !!wallet.account);
+  if (wallet.account && fromMode === "demo" && !paintWallet.done) { paintWallet.done = true; setFrom("mine"); }
+  else setFrom(fromMode);
+}
+async function openWallets() {
+  const list = $("walletList"); $("walletErr").textContent = "";
+  list.innerHTML = "<li class='muted small'>Loading wallets…</li>";
+  $("walletDialog").showModal();
+  const sel = await selectorReady;
+  const mods = sel.store.getState().modules;
+  list.innerHTML = "";
+  for (const m of mods) {
+    const li = document.createElement("li"), b = document.createElement("button");
+    b.type = "button";
+    b.innerHTML = `<img alt="" src="${esc(m.metadata.iconUrl)}">${esc(m.metadata.name)}${m.metadata.available ? "" : "<small>not installed</small>"}`;
+    b.onclick = async () => {
+      try {
+        const w = await sel.wallet(m.id);
+        await w.signIn({ contractId: await contractId, methodNames: [] });
+        $("walletDialog").close();
+      } catch (e) { $("walletErr").textContent = friendly(e); }
+    };
+    li.appendChild(b); list.appendChild(li);
+  }
+}
+async function signOut() { try { const w = await wallet.selector.wallet(); await w.signOut(); } catch {} wallet.account = null; paintWallet(); }
+$("walletChip").onclick = () => wallet.account ? (tab("deposit"), setFrom("mine")) : openWallets();
+const NEAR1 = 10n ** 24n, TGAS = 10n ** 12n;
+async function walletCall(methodName, args, deposit) {
+  const sel = await selectorReady, w = await sel.wallet();
+  return w.signAndSendTransaction({ receiverId: await contractId, actions: [actionCreators.functionCall(methodName, args, 100n * TGAS, deposit)] });
+}
+const walletDeposit = commitment => walletCall("deposit", { commitment }, NEAR1);
+// back from a redirect wallet (MyNearWallet): finish or cancel the pending deposit
+(() => {
+  const q = new URLSearchParams(location.search), pending = JSON.parse(store.get("cp_pending") || "null");
+  if (!pending || !(q.has("transactionHashes") || q.has("errorCode"))) return;
+  store.set("cp_pending", "");
+  history.replaceState(null, "", location.pathname);
+  if (q.has("transactionHashes")) showDeposited(pending.text, pending.commitment, q.get("transactionHashes").split(",").pop());
+  else alertInline($("noteBox"), "You cancelled in the wallet. Nothing was sent.");
+})();
 function alertInline(el, msg) { el.classList.remove("hidden"); el.innerHTML = `<strong>Something went wrong</strong><p class="muted small">${esc(msg)}</p>`; }
 $("copyNote").onclick = async () => { try { await navigator.clipboard.writeText($("noteText").textContent); $("copyNote").textContent = "Copied"; } catch { } };
 $("saveNote").onclick = () => {
@@ -175,12 +275,20 @@ $("withdrawBtn").onclick = async () => {
   } finally { btn.disabled = false; }
 };
 
-// ---------- ragequit (demo flagged wallet) ----------
+// ---------- ragequit: public refund to the wallet that deposited ----------
 $("ragequitBtn").onclick = async () => {
   const b = $("ragequitBtn"); b.disabled = true; b.textContent = "Returning…";
   try {
     const n = C.parseNote($("noteIn").value);
-    const r = await api("/api/demo/ragequit", { nullifier: n.nullifier.toString(), secret: n.secret.toString() });
+    const d = state?.deposits[state.poolLeaves.indexOf(n.commitment.toString())];
+    const args = { nullifier: n.nullifier.toString(), secret: n.secret.toString() };
+    let r;
+    if (d && wallet.account && d.depositor === wallet.account) {
+      const out = await walletCall("ragequit", args, 0n);
+      r = { tx: out?.transaction?.hash || out?.transaction_outcome?.id };
+    } else if (d && !d.flagged) {
+      throw new Error(`Connect ${d.depositor}, the wallet that made this deposit.`);
+    } else r = await api("/api/demo/ragequit", args);
     $("rqResult").innerHTML = `Returned to the original wallet · <a href="${EXPLORER}/txns/${esc(r.tx)}" target="_blank" rel="noopener">tx ↗</a>`;
     b.textContent = "Returned";
     refresh();
