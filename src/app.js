@@ -22,13 +22,30 @@ const api = async (path, body) => {
 const hex = n => [...crypto.getRandomValues(new Uint8Array(n))].map(b => b.toString(16).padStart(2, "0")).join("");
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-let state = null, myCommitments = new Set(JSON.parse(store.get("cp_mine") || "[]"));
+let state = null, pool = store.get("cp_pool") || "1", myCommitments = new Set(JSON.parse(store.get("cp_mine") || "[]"));
 const ready = C.init();
 
 // ---------- pool panel ----------
+const SIZES = ["0.1", "0.5", "1", "5"];
+if (!SIZES.includes(pool)) pool = "1";
+const NEAR = a => BigInt(Math.round(Number(a) * 1e6)) * 10n ** 18n;
+const poolFromNote = n => { const a = String(n.pool).replace(/near$/i, ""); return SIZES.includes(a) ? a : null; };
+function setPool(a) {
+  if (!SIZES.includes(a)) return;
+  const changed = a !== pool;
+  pool = a; store.set("cp_pool", a);
+  document.querySelectorAll("[data-size]").forEach(x => x.classList.toggle("on", x.dataset.size === a));
+  document.querySelectorAll(".poolAmt").forEach(x => x.textContent = a);
+  $("amtBig").textContent = a;
+  if (!$("depositBtn").disabled) $("depositBtn").innerHTML = depLabel();
+  if (changed) { state = null; $("dots").innerHTML = ""; ["sDeposits", "sApproved", "sWithdrawals"].forEach(id => $(id).textContent = "–"); return refresh(); }
+}
+const depLabel = () => `Deposit ${pool} NEAR <span class="arr">→</span>`;
 async function refresh() {
   try {
-    state = await api("/api/state");
+    const want = pool, st = await api(`/api/state?pool=${want}`);
+    if (want !== pool) return;
+    state = st;
     $("sDeposits").textContent = state.stats.deposits;
     $("sApproved").textContent = state.approvedLeaves.length;
     $("sWithdrawals").textContent = state.stats.withdrawals + state.stats.ragequits;
@@ -44,7 +61,8 @@ async function refresh() {
     });
   } catch (e) { console.warn(e); }
 }
-refresh(); setInterval(refresh, 8000);
+document.querySelectorAll("[data-size]").forEach(b => b.onclick = () => setPool(b.dataset.size));
+setTimeout(() => setPool(pool), 0); refresh(); setInterval(refresh, 8000);
 
 // ---------- tabs ----------
 function tab(name) {
@@ -56,7 +74,6 @@ function tab(name) {
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => tab(t.dataset.tab));
 
 // ---------- deposit ----------
-const DEP_LABEL = 'Deposit 1 NEAR <span class="arr">→</span>';
 function showDeposited(text, commitment, tx) {
   myCommitments.add(commitment); store.set("cp_mine", JSON.stringify([...myCommitments]));
   store.set("cp_last_note", text);
@@ -68,7 +85,7 @@ function showDeposited(text, commitment, tx) {
   const btn = $("depositBtn");
   btn.disabled = true;
   btn.innerHTML = `Deposited · <a href="${EXPLORER}/txns/${esc(tx)}" target="_blank" rel="noopener" style="color:#fff">view tx ↗</a>`;
-  setTimeout(() => { btn.disabled = false; btn.innerHTML = DEP_LABEL; }, 4000);
+  setTimeout(() => { btn.disabled = false; btn.innerHTML = depLabel(); }, 4000);
   refresh();
 }
 $("depositBtn").onclick = async () => {
@@ -78,22 +95,22 @@ $("depositBtn").onclick = async () => {
   try {
     await ready;
     const note = C.makeNote();
-    const text = C.noteToString(note, "1near"), commitment = note.commitment.toString();
+    const amt = pool, text = C.noteToString(note, `${amt}near`), commitment = note.commitment.toString();
     if (fromMode === "mine") {
       // saved before signing: redirect wallets leave this page and come back
       store.set("cp_pending", JSON.stringify({ text, commitment }));
       btn.textContent = "Confirm in your wallet…";
-      const out = await walletDeposit(commitment);
+      const out = await walletDeposit(amt, commitment);
       if (!out) return; // redirect wallet: finished on return
       store.set("cp_pending", "");
       showDeposited(text, commitment, out.transaction?.hash || out.transaction_outcome?.id);
     } else {
       btn.textContent = "Depositing on NEAR…";
-      const r = await api("/api/demo/deposit", { commitment, flagged: $("flaggedToggle").checked });
+      const r = await api("/api/demo/deposit", { pool: amt, commitment, flagged: $("flaggedToggle").checked });
       showDeposited(text, commitment, r.tx);
     }
   } catch (e) {
-    btn.disabled = false; btn.innerHTML = DEP_LABEL;
+    btn.disabled = false; btn.innerHTML = depLabel();
     alertInline($("noteBox"), friendly(e));
   }
 };
@@ -161,12 +178,13 @@ async function openWallets() {
 }
 async function signOut() { try { const w = await wallet.selector.wallet(); await w.signOut(); } catch {} wallet.account = null; paintWallet(); }
 $("walletChip").onclick = () => { setFrom("mine"); wallet.account ? tab("deposit") : openWallets(); };
-const NEAR1 = 10n ** 24n, TGAS = 10n ** 12n;
-async function walletCall(methodName, args, deposit) {
+const TGAS = 10n ** 12n;
+const poolContract = async a => (await api(`/api/state?pool=${a}`)).contract;
+async function walletCall(a, methodName, args, deposit) {
   const sel = await selectorReady, w = await sel.wallet();
-  return w.signAndSendTransaction({ receiverId: await contractId, actions: [actionCreators.functionCall(methodName, args, 100n * TGAS, deposit)] });
+  return w.signAndSendTransaction({ receiverId: await poolContract(a), actions: [actionCreators.functionCall(methodName, args, 100n * TGAS, deposit)] });
 }
-const walletDeposit = commitment => walletCall("deposit", { commitment }, NEAR1);
+const walletDeposit = (a, commitment) => walletCall(a, "deposit", { commitment }, NEAR(a));
 // back from a redirect wallet (MyNearWallet): finish or cancel the pending deposit
 (() => {
   const q = new URLSearchParams(location.search), pending = JSON.parse(store.get("cp_pending") || "null");
@@ -198,7 +216,10 @@ document.querySelectorAll("[data-to]").forEach(b => b.onclick = () => {
 // ---------- agent ----------
 function noteContext() {
   let note; try { note = C.parseNote($("noteIn").value); } catch { return null; }
-  if (!state) return null;
+  const np = poolFromNote(note);
+  if (!np) return null;
+  if (np !== pool) { setPool(np); return { note, loading: true }; }
+  if (!state) return { note, loading: true };
   const idx = state.poolLeaves.indexOf(note.commitment.toString());
   if (idx < 0) return { note, inPool: false };
   const d = state.deposits[idx];
@@ -217,6 +238,7 @@ async function advise(question) {
     const nc = noteContext(), t = $("agentText"), tag = $("agentTag"), meta = $("agentMeta");
     $("badBox").classList.add("hidden");
     if (!nc) { t.textContent = "Paste a note and I'll check if now is a good time."; tag.className = "tag"; tag.textContent = ""; meta.textContent = ""; return; }
+    if (nc.loading) { t.textContent = "Loading the pool for this note…"; setTimeout(() => advise(question), 700); return; }
     if (!nc.inPool) { t.textContent = "I can't find this deposit in the pool yet. If you just deposited, give it a few seconds."; return; }
     if (!nc.approved) $("badBox").classList.remove("hidden");
     t.textContent = "Thinking…"; meta.textContent = "";
@@ -254,7 +276,11 @@ $("withdrawBtn").onclick = async () => {
   btn.disabled = true;
   const set = steps(["Loading pool", "Building proof in your browser", "Relaying to NEAR", "Done"]);
   try {
-    set(0, "doing"); await ready; await refresh(); set(0, "done");
+    set(0, "doing"); await ready;
+    const np = poolFromNote(note);
+    if (!np) throw new Error("This note is for a pool size this app doesn't know");
+    if (np !== pool) await setPool(np);
+    await refresh(); set(0, "done");
     set(1, "doing");
     let input;
     try { input = await C.witnessInput(note, state.poolLeaves, state.approvedLeaves, recipient); }
@@ -263,10 +289,10 @@ $("withdrawBtn").onclick = async () => {
     const { proof } = await snarkjs.groth16.fullProve(input, "/zk/withdraw_js/withdraw.wasm", "/zk/withdraw.zkey");
     set(1, "done"); $("steps").children[1].textContent = `Proof built in ${((performance.now() - t0) / 1000).toFixed(1)}s`;
     set(2, "doing");
-    const r = await api("/api/relay", { proof, root: input.root, asp_root: input.aspRoot, nullifier_hash: input.nullifierHash, recipient });
+    const r = await api("/api/relay", { pool, proof, root: input.root, asp_root: input.aspRoot, nullifier_hash: input.nullifierHash, recipient });
     set(2, "done"); set(3, "done");
     const res = $("result"); res.classList.remove("hidden");
-    res.innerHTML = `<h4>1 NEAR sent privately</h4>
+    res.innerHTML = `<h4>${esc(pool)} NEAR sent privately</h4>
       <div>To <a href="${EXPLORER}/address/${esc(recipient)}" target="_blank" rel="noopener">${esc(recipient.length > 30 ? recipient.slice(0, 10) + "…" + recipient.slice(-6) : recipient)} ↗</a> · <a href="${EXPLORER}/txns/${esc(r.tx)}" target="_blank" rel="noopener">tx ↗</a></div>
       ${freshKey ? `<p class="small muted" style="margin:10px 0 0">Private key for the new address. Save it to use the funds.</p><code>${esc(freshKey)}</code><button class="btn ghost sm" id="copyKey" type="button">Copy key</button>` : ""}`;
     if (freshKey) $("copyKey").onclick = async () => { try { await navigator.clipboard.writeText(freshKey); $("copyKey").textContent = "Copied"; } catch {} };
@@ -287,11 +313,11 @@ $("ragequitBtn").onclick = async () => {
     const args = { nullifier: n.nullifier.toString(), secret: n.secret.toString() };
     let r;
     if (d && wallet.account && d.depositor === wallet.account) {
-      const out = await walletCall("ragequit", args, 0n);
+      const out = await walletCall(pool, "ragequit", args, 0n);
       r = { tx: out?.transaction?.hash || out?.transaction_outcome?.id };
     } else if (d && !d.flagged) {
       throw new Error(`Connect ${d.depositor}, the wallet that made this deposit.`);
-    } else r = await api("/api/demo/ragequit", args);
+    } else r = await api("/api/demo/ragequit", { pool, ...args });
     $("rqResult").innerHTML = `Returned to the original wallet · <a href="${EXPLORER}/txns/${esc(r.tx)}" target="_blank" rel="noopener">tx ↗</a>`;
     b.textContent = "Returned";
     refresh();
@@ -307,7 +333,7 @@ document.querySelectorAll("[data-chain]").forEach(b => b.onclick = () => {
 });
 async function loadQuote() {
   $("quoteText").textContent = "…";
-  try { const q = await api(`/api/quote?to=${chain}`); $("quoteText").textContent = `≈ ${q.out} ${q.to.split(" ")[0]} · ~${Math.round(q.seconds / 60) || 1} min`; }
+  try { const q = await api(`/api/quote?to=${chain}&pool=${pool}`); $("quoteText").textContent = `≈ ${q.out} ${q.to.split(" ")[0]} · ~${Math.round(q.seconds / 60) || 1} min`; }
   catch { $("quoteText").textContent = "Quote unavailable right now"; }
 }
 

@@ -6,7 +6,7 @@ Built at NEAR HACKATHON 2026 · Tracks: Privacy & Private AI, Agent Economy, Uns
 
 - Live app: https://clearpool.onrender.com
 - Usage manual: [MANUAL.md](MANUAL.md)
-- Contract (testnet): [`clearpool-bdb0ab.testnet`](https://testnet.nearblocks.io/address/clearpool-bdb0ab.testnet)
+- Contracts (testnet), one per fixed size, same code: [0.1 NEAR](https://testnet.nearblocks.io/address/clearpool-p01-bdb0ab.testnet) · [0.5 NEAR](https://testnet.nearblocks.io/address/clearpool-p05-bdb0ab.testnet) · [1 NEAR](https://testnet.nearblocks.io/address/clearpool-bdb0ab.testnet) · [5 NEAR](https://testnet.nearblocks.io/address/clearpool-p5-bdb0ab.testnet)
 
 ## The problem
 
@@ -14,14 +14,14 @@ On a public chain anyone you pay can see your whole history, and anyone who pays
 
 ## What ClearPool does
 
-1. You deposit a fixed 1 NEAR from your own NEAR wallet (Meteor, HERE, Intear via wallet-selector) or a demo wallet. Your browser creates a secret **note**. Only a hash of it goes on-chain.
+1. You pick a fixed size (0.1, 0.5, 1 or 5 NEAR; each size is its own pool so every deposit in it looks identical) and deposit from your own NEAR wallet (Meteor, HERE, Intear via wallet-selector) or a demo wallet. Your browser creates a secret **note**. Only a hash of it goes on-chain.
 2. To withdraw, your browser builds a **zero-knowledge proof** that you own *some* deposit in the pool **and** that the deposit is in the **approved set**, without revealing which one.
 3. The contract verifies the proof on-chain and pays a **fresh address**. A relayer submits the transaction, so the new address needs no gas.
 4. Deposits that aren't approved (e.g. from a flagged wallet) **can't** withdraw privately. They can only `ragequit`: a public refund to the wallet that sent them.
 
 A **privacy agent** tells you when withdrawing is safe: whether enough deposits have landed after yours, and whether you're withdrawing to a fresh address. It runs on **NEAR AI Cloud inside a TEE**. The app checks the enclave's Intel TDX quote against a nonce your browser generates, and checks that each answer is signed by the attested key.
 
-Optional: a live **NEAR Intents** quote shows what your 1 NEAR becomes on Zcash, Base or Solana.
+Optional: a live **NEAR Intents** quote shows what your deposit becomes on Zcash, Base or Solana.
 
 ## Try it (do X, see Y)
 
@@ -29,13 +29,13 @@ Open the live app.
 
 | Do | See |
 |---|---|
-| With the card toggle on **Demo** (default, no wallet needed), click **Deposit 1 NEAR** | A tx link, your note, and a new black dot ("yours") in *Live pool* |
-| Or flip the toggle to **Testnet**, connect a testnet wallet, deposit | Your wallet asks to approve `deposit` with 1 NEAR on the contract |
-| Click **Withdraw →**, then **Withdraw privately** | "Proof built in ~1s", then "1 NEAR sent privately" to a brand-new 64-hex address with its private key. The explorer shows the payout came from the contract, not from your deposit wallet |
+| With the card toggle on **Demo** (default, no wallet needed), pick a size and click **Deposit** | A tx link, your note, and a new black dot ("yours") in *Live pool* |
+| Or flip the toggle to **Testnet**, connect a testnet wallet, deposit | Your wallet asks to approve `deposit` with that amount on the pool contract |
+| Click **Withdraw →**, then **Withdraw privately** | "Proof built in ~1s", then "X NEAR sent privately" to a brand-new 64-hex address with its private key. The explorer shows the payout came from the contract, not from your deposit wallet |
 | Click **Withdraw privately** again with the same note | Fails with `note already spent` |
 | On **Deposit**, switch on **Send from a flagged wallet**, deposit, then try to withdraw | "Not in the approved set". **Return to sender** refunds only the original wallet |
 | Click **Enclave verified** in the bottom status bar | 4 checks: Intel TDX quote signature, your nonce inside the quote, model signing key inside the quote, NVIDIA GPU evidence |
-| Open **Want it on another chain?** | A live NEAR Intents dry quote for 1 NEAR → ZEC / USDC on Base / SOL |
+| Open **Want it on another chain?** | A live NEAR Intents dry quote for the pool size → ZEC / USDC on Base / SOL |
 
 Scripted end-to-end check against the live deployment (no keys needed, only Node 20+):
 
@@ -54,7 +54,7 @@ node scripts/e2e.js https://clearpool.onrender.com
 browser                         server (relayer + ASP + agent proxy)          NEAR testnet contract
 ──────────                      ──────────────────────────────────            ─────────────────────
 note = (nullifier, secret)
-commitment = Poseidon(n, s) ──► demo wallet deposits 1 NEAR ───────────────► insert into Poseidon Merkle tree (on-chain)
+commitment = Poseidon(n, s) ──► wallet deposits 0.1/0.5/1/5 ───────────────► insert into Poseidon Merkle tree (on-chain)
                                 ASP screens depositor, publishes root ──────► set_asp_root (approved-set root)
 Groth16 proof in browser:
  · commitment ∈ pool tree

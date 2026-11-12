@@ -13,7 +13,13 @@ import { account, view, provider, NEAR, keyFor } from "./lib/near.js";
 // ---------- config ----------
 try { for (const l of fs.readFileSync(".env", "utf8").split("\n")) { const m = /^([A-Z0-9_]+)=(.*)$/.exec(l.trim()); if (m && !process.env[m[1]] && m[2]) process.env[m[1]] = m[2]; } } catch {}
 const SUF = process.env.SUFFIX || fs.readFileSync(".keys/suffix", "utf8").trim();
-const CONTRACT = `clearpool-${SUF}.testnet`;
+const CONTRACT = `clearpool-${SUF}.testnet`; // the original 1 NEAR pool
+// Fixed-size pools: same contract code, one deployment per size. Fixed sizes keep every deposit in a pool identical.
+const POOLS = Object.fromEntries([["0.1", 4], ["0.5", 4], ["1", 4], ["5", 2]].map(([amt, seedN]) => [amt, {
+  amt, seedN, contract: amt === "1" ? CONTRACT : `clearpool-p${amt.replace(".", "")}-${SUF}.testnet`,
+  deposits: [], approved: [], stats: null, syncing: null,
+}]));
+const poolOf = a => POOLS[String(a ?? "1").replace(/near$/i, "")] || null;
 const ASP = `cp-asp-${SUF}.testnet`;
 const HACKER = `cp-hacker-${SUF}.testnet`;
 const FUNDERS = ["alice", "d1", "d2", "d3"].map(n => `cp-${n}-${SUF}.testnet`);
@@ -27,30 +33,25 @@ const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 await C.init();
 const extraFunders = []; // accounts auto-created from the faucet when demo funds run low: {id, key}
 
-// ---------- chain state + ASP ----------
-let deposits = []; // {index, commitment, depositor, ts}
-let approved = []; // commitments (decimal) in deposit order
-let aspRoot = null, poolRoot = null, stats = null;
-let syncing = null;
-
-async function sync() {
-  if (syncing) return syncing;
-  syncing = (async () => {
-    stats = await view(CONTRACT, "get_stats");
-    while (deposits.length < stats.deposits) deposits.push(...await view(CONTRACT, "get_deposits", { from: deposits.length, limit: 50 }));
-    approved = deposits.filter(d => !FLAGGED.has(d.depositor)).map(d => d.commitment);
-    poolRoot = stats.last_root;
-    const want = C.buildTree(approved).root.toString();
-    if (approved.length && want !== stats.asp_root) {
-      log("ASP publishing root for", approved.length, "approved deposits");
-      await account(ASP).callFunction({ contractId: CONTRACT, methodName: "set_asp_root", args: { root: want }, gas: 30n * TGAS });
+// ---------- chain state + ASP (per pool) ----------
+async function sync(P) {
+  if (P.syncing) return P.syncing;
+  P.syncing = (async () => {
+    const stats = await view(P.contract, "get_stats");
+    while (P.deposits.length < stats.deposits) P.deposits.push(...await view(P.contract, "get_deposits", { from: P.deposits.length, limit: 50 }));
+    P.approved = P.deposits.filter(d => !FLAGGED.has(d.depositor)).map(d => d.commitment);
+    const want = C.buildTree(P.approved).root.toString();
+    if (P.approved.length && want !== stats.asp_root) {
+      log(`ASP publishing ${P.amt} NEAR pool root for`, P.approved.length, "approved deposits");
+      await account(ASP).callFunction({ contractId: P.contract, methodName: "set_asp_root", args: { root: want }, gas: 30n * TGAS });
       stats.asp_root = want;
     }
-    aspRoot = stats.asp_root;
-  })().finally(() => { syncing = null; });
-  return syncing;
+    P.stats = stats;
+  })().finally(() => { P.syncing = null; });
+  return P.syncing;
 }
-setInterval(() => sync().catch(e => log("sync error", e.message)), 10000);
+const syncAll = () => Promise.all(Object.values(POOLS).map(P => sync(P).catch(e => log(P.amt, "sync error", e.message))));
+setInterval(syncAll, 10000);
 
 // ---------- demo funding ----------
 const balance = async id => BigInt((await provider.viewAccount({ accountId: id })).amount);
@@ -64,30 +65,31 @@ async function faucetAccount() {
   log("faucet funded", id);
   return id;
 }
-async function pickFunder() {
+async function pickFunder(amt = 1) {
   for (const id of [...FUNDERS, ...extraFunders.map(f => f.id)]) {
-    try { if (await balance(id) > NEAR(1.3)) return id; } catch {}
+    try { if (await balance(id) > NEAR(amt + 0.3)) return id; } catch {}
   }
   return faucetAccount();
 }
 const acct = id => new Account(id, provider, keyOf(id));
 
-async function depositFrom(id, commitment) {
-  const r = await acct(id).callFunctionRaw({ contractId: CONTRACT, methodName: "deposit", args: { commitment }, deposit: NEAR(1), gas: 100n * TGAS, waitUntil: "FINAL" });
-  return r;
+async function depositFrom(P, id, commitment) {
+  return acct(id).callFunctionRaw({ contractId: P.contract, methodName: "deposit", args: { commitment }, deposit: NEAR(Number(P.amt)), gas: 100n * TGAS, waitUntil: "FINAL" });
 }
 
 // seed a small anonymity set so the demo pool isn't empty (these notes are discarded; funds stay in the pool)
 async function seed() {
-  await sync();
-  const want = Number(process.env.SEED_DEPOSITS || 4);
-  const others = deposits.filter(d => !FLAGGED.has(d.depositor)).length;
-  for (let i = others; i < want; i++) {
-    const id = await pickFunder();
-    await depositFrom(id, C.makeNote().commitment.toString());
-    log("seed deposit from", id);
+  for (const P of Object.values(POOLS)) {
+    try {
+      await sync(P);
+      for (let i = P.approved.length; i < P.seedN; i++) {
+        const id = await pickFunder(Number(P.amt));
+        await depositFrom(P, id, C.makeNote().commitment.toString());
+        log(`seed ${P.amt} NEAR deposit from`, id);
+      }
+      await sync(P);
+    } catch (e) { log(P.amt, "seed error", e.message); }
   }
-  await sync();
 }
 
 // ---------- simple rate limit ----------
@@ -136,7 +138,7 @@ async function attest(nonce) {
 
 const sha256hex = b => crypto.createHash("sha256").update(b).digest("hex");
 const SYSTEM = `You are ClearPool's privacy assistant, running inside a verified TEE.
-ClearPool is a privacy pool on NEAR: fixed 1 NEAR deposits, private withdrawals with a zero-knowledge proof, and only deposits in the approved (clean) set can withdraw privately.
+ClearPool is a privacy pool on NEAR: fixed-size deposits (separate pools of 0.1, 0.5, 1 and 5 NEAR), private withdrawals with a zero-knowledge proof, and only deposits in the approved (clean) set can withdraw privately.
 Answer in 1-3 short sentences, plain words, no markdown. Give a clear recommendation.
 Rules, in order: if approved is false, say it cannot be withdrawn privately and can only go back to the sender. If depositsAfter is under 3, recommend waiting for more deposits (timing can link you). If minutesSinceDeposit is under 10, suggest waiting a bit longer. If freshRecipient is false, warn that sending to a known account weakens privacy. Otherwise say it's reasonable to withdraw now. Never invent pool numbers; only use the context given.
 You never ask for the user's note or secret.`;
@@ -180,11 +182,11 @@ const DEST = {
   "usdc-base": { asset: "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near", label: "USDC on Base", ph: "0x000000000000000000000000000000000000dead" },
   sol: { asset: "nep141:sol.omft.near", label: "SOL on Solana", ph: "11111111111111111111111111111111" },
 };
-async function quote(to, recipient) {
+async function quote(to, recipient, amt = 1) {
   const d = DEST[to] || DEST.zec;
   const r = await fetch("https://1click.chaindefuser.com/v0/quote", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
     dry: true, swapType: "EXACT_INPUT", slippageTolerance: 100, originAsset: "nep141:wrap.near", depositType: "ORIGIN_CHAIN",
-    destinationAsset: d.asset, amount: NEAR(1).toString(), recipient: recipient || d.ph, recipientType: "DESTINATION_CHAIN",
+    destinationAsset: d.asset, amount: NEAR(amt).toString(), recipient: recipient || d.ph, recipientType: "DESTINATION_CHAIN",
     refundTo: "clearpool.near", refundType: "ORIGIN_CHAIN", deadline: new Date(Date.now() + 5 * 60e3).toISOString(),
   }) });
   const j = await r.json();
@@ -202,11 +204,14 @@ app.use(express.static("public", { index: "index.html" }));
 
 app.get("/api/state", async (req, res) => {
   try {
-    await sync();
+    const P = poolOf(req.query.pool);
+    if (!P) return res.status(400).json({ error: "Unknown pool size" });
+    await sync(P);
     res.json({
-      network: "testnet", contract: CONTRACT, asp: ASP, denomination: "1", stats, poolRoot, aspRoot,
-      poolLeaves: deposits.map(d => d.commitment), approvedLeaves: approved,
-      deposits: deposits.map(d => ({ index: d.index, ts: d.ts, depositor: d.depositor, approved: !FLAGGED.has(d.depositor), flagged: FLAGGED.has(d.depositor) })),
+      network: "testnet", pool: P.amt, contract: P.contract, asp: ASP, denomination: P.amt, stats: P.stats, poolRoot: P.stats.last_root, aspRoot: P.stats.asp_root,
+      pools: Object.values(POOLS).map(x => ({ amount: x.amt, contract: x.contract, deposits: x.deposits.length })),
+      poolLeaves: P.deposits.map(d => d.commitment), approvedLeaves: P.approved,
+      deposits: P.deposits.map(d => ({ index: d.index, ts: d.ts, depositor: d.depositor, approved: !FLAGGED.has(d.depositor), flagged: FLAGGED.has(d.depositor) })),
       agent: !!process.env.NEARAI_API_KEY, model: MODEL,
     });
   } catch (e) { res.status(500).json({ error: friendly(e) }); }
@@ -215,13 +220,15 @@ app.get("/api/state", async (req, res) => {
 app.post("/api/demo/deposit", async (req, res) => {
   if (!limit(req, res, "dep", 12, 3600e3)) return;
   try {
-    const { commitment, flagged } = req.body;
+    const { commitment, flagged } = req.body, P = poolOf(req.body.pool);
+    if (!P) return res.status(400).json({ error: "Unknown pool size" });
     if (!/^\d{1,78}$/.test(commitment || "")) return res.status(400).json({ error: "bad commitment" });
-    const from = flagged ? HACKER : await pickFunder();
-    if (flagged && await balance(HACKER) < NEAR(1.3)) return res.status(503).json({ error: "The flagged demo wallet is out of test funds." });
-    const r = await depositFrom(from, commitment);
-    await sync();
-    const d = deposits.find(x => x.commitment === commitment);
+    const amt = Number(P.amt);
+    if (flagged && await balance(HACKER) < NEAR(amt + 0.3)) return res.status(503).json({ error: "The flagged demo wallet is out of test funds." });
+    const from = flagged ? HACKER : await pickFunder(amt);
+    const r = await depositFrom(P, from, commitment);
+    await sync(P);
+    const d = P.deposits.find(x => x.commitment === commitment);
     res.json({ tx: txHash(r), index: d?.index, from, flagged: FLAGGED.has(from) });
   } catch (e) { res.status(500).json({ error: friendly(e) }); }
 });
@@ -229,11 +236,12 @@ app.post("/api/demo/deposit", async (req, res) => {
 app.post("/api/relay", async (req, res) => {
   if (!limit(req, res, "rel", 20, 3600e3)) return;
   try {
-    const { proof, root, asp_root, nullifier_hash, recipient } = req.body;
+    const { proof, root, asp_root, nullifier_hash, recipient } = req.body, P = poolOf(req.body.pool);
+    if (!P) return res.status(400).json({ error: "Unknown pool size" });
     if (!/^([0-9a-f]{64}|[a-z0-9._-]{2,64}\.testnet)$/.test(recipient || "")) return res.status(400).json({ error: "Recipient must be a testnet account or a fresh 64-character address" });
     const p = { pi_a: proof.pi_a.slice(0, 2), pi_b: proof.pi_b.slice(0, 2), pi_c: proof.pi_c.slice(0, 2) };
-    const r = await account(ASP).callFunctionRaw({ contractId: CONTRACT, methodName: "withdraw", args: { proof: p, root, asp_root, nullifier_hash, recipient }, gas: 150n * TGAS, waitUntil: "FINAL" });
-    sync().catch(() => {});
+    const r = await account(ASP).callFunctionRaw({ contractId: P.contract, methodName: "withdraw", args: { proof: p, root, asp_root, nullifier_hash, recipient }, gas: 150n * TGAS, waitUntil: "FINAL" });
+    sync(P).catch(() => {});
     res.json({ tx: txHash(r), recipient });
   } catch (e) { res.status(400).json({ error: friendly(e) }); }
 });
@@ -241,9 +249,10 @@ app.post("/api/relay", async (req, res) => {
 app.post("/api/demo/ragequit", async (req, res) => {
   if (!limit(req, res, "rq", 10, 3600e3)) return;
   try {
-    const { nullifier, secret } = req.body;
-    const r = await account(HACKER).callFunctionRaw({ contractId: CONTRACT, methodName: "ragequit", args: { nullifier, secret }, gas: 100n * TGAS, waitUntil: "FINAL" });
-    sync().catch(() => {});
+    const { nullifier, secret } = req.body, P = poolOf(req.body.pool);
+    if (!P) return res.status(400).json({ error: "Unknown pool size" });
+    const r = await account(HACKER).callFunctionRaw({ contractId: P.contract, methodName: "ragequit", args: { nullifier, secret }, gas: 100n * TGAS, waitUntil: "FINAL" });
+    sync(P).catch(() => {});
     res.json({ tx: txHash(r), to: HACKER });
   } catch (e) { res.status(400).json({ error: friendly(e) }); }
 });
@@ -260,11 +269,11 @@ app.post("/api/agent", async (req, res) => {
 });
 
 app.get("/api/quote", async (req, res) => {
-  try { res.json(await quote(String(req.query.to || "zec"), req.query.recipient && String(req.query.recipient))); }
+  try { res.json(await quote(String(req.query.to || "zec"), req.query.recipient && String(req.query.recipient), Number(poolOf(req.query.pool)?.amt || 1))); }
   catch (e) { res.status(502).json({ error: friendly(e) }); }
 });
 
-app.get("/healthz", (req, res) => res.json({ ok: true, contract: CONTRACT, deposits: deposits.length }));
+app.get("/healthz", (req, res) => res.json({ ok: true, pools: Object.fromEntries(Object.values(POOLS).map(P => [P.amt, P.deposits.length])) }));
 
 app.listen(PORT, () => log(`ClearPool on :${PORT} contract ${CONTRACT}`));
 

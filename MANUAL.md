@@ -1,6 +1,6 @@
 # ClearPool usage manual
 
-ClearPool lets you move 1 NEAR to a brand-new address without anyone being able to link the two, as long as your money is clean.
+ClearPool lets you move NEAR to a brand-new address without anyone being able to link the two, as long as your money is clean.
 
 Live app: https://clearpool.onrender.com · Network: **NEAR testnet** (no real money)
 
@@ -20,11 +20,12 @@ Live app: https://clearpool.onrender.com · Network: **NEAR testnet** (no real m
 1. Open the **Deposit** tab.
 2. Use the **Demo / Testnet** toggle at the top of the card. **Testnet** uses your own wallet; **Demo** pays from a demo wallet so you can try it without one.
 3. On **Testnet**, click **Connect wallet** and choose Meteor, HERE or Intear. Your account shows in the header.
-4. Click **Deposit 1 NEAR**. With your own wallet, approve the transaction (1 NEAR + a little gas) in the wallet.
-5. Wait a few seconds. The button changes to **Deposited · view tx ↗** (opens the transaction on NearBlocks).
-6. A green box appears with **Your note**.
+4. Pick a size: **0.1, 0.5, 1 or 5 NEAR**. Each size is a separate pool, so every deposit in it looks the same; that's what hides you. For other amounts, make several deposits (e.g. 1.5 = 1 + 0.5), each with its own note.
+5. Click **Deposit**. With your own wallet, approve the transaction (the amount + a little gas) in the wallet.
+6. Wait a few seconds. The button changes to **Deposited · view tx ↗** (opens the transaction on NearBlocks).
+7. A green box appears with **Your note**.
 
-**Save your note.** It's the only key to your deposit. Use **Copy** or **Download**. Lose it and the 1 NEAR is gone for good. Anyone who has it can take the money.
+**Save your note.** It's the only key to your deposit. Use **Copy** or **Download**. Lose it and the deposit is gone for good. Anyone who has it can take the money.
 
 In **Live pool** on the right, your deposit shows as a black dot.
 
@@ -57,9 +58,9 @@ The agent never sees your note. It only gets rough numbers: pool size, roughly h
    - **Proof built in X s**: your browser proves you own a clean deposit without revealing which one. Usually 1–4 seconds.
    - **Relaying to NEAR**: a relayer submits the transaction and pays the gas, so your new address needs nothing.
    - **Done**
-4. You'll see **1 NEAR sent privately**, links to the new address and the transaction, and, for a new address, its **private key**.
+4. You'll see **X NEAR sent privately** (the note's size), links to the new address and the transaction, and, for a new address, its **private key**.
 
-**Save that private key.** It's the only way to use the 1 NEAR at the new address.
+**Save that private key.** It's the only way to use the funds at the new address.
 
 ### Using the funds at the new address
 Import the private key into a NEAR wallet that supports testnet and private-key import (for example Meteor Wallet: *Add wallet → Import with private key*, network set to testnet). The 64-character address is a NEAR "implicit account", so it works like any other account once imported.
@@ -73,7 +74,7 @@ To see this, set the card to **Demo** and switch on **Send from a flagged wallet
 When you try to withdraw a flagged deposit:
 - The step shows **Not in the approved set**.
 - A red box explains it can't leave privately.
-- **Return to sender** sends the 1 NEAR back to the wallet it came from, and only that wallet. This refund is public.
+- **Return to sender** sends the deposit back to the wallet it came from, and only that wallet. This refund is public.
 - If you deposited from your own wallet, connect that same wallet first: it signs the refund.
 
 This is the point of ClearPool: honest money gets privacy, flagged money can only go back where it came from.
@@ -95,7 +96,7 @@ Click **Enclave verified** in the status bar at the bottom of the page. Your bro
 
 ## 6. Another chain (preview)
 
-On the Withdraw tab, open **Want it on another chain?** and pick **ZEC**, **USDC · Base** or **SOL**. You'll see a live NEAR Intents quote for 1 NEAR and the expected time.
+On the Withdraw tab, open **Want it on another chain?** and pick **ZEC**, **USDC · Base** or **SOL**. You'll see a live NEAR Intents quote for your pool size and the expected time.
 
 This is a **preview only**. NEAR Intents runs on mainnet, and ClearPool is on testnet, so no swap happens.
 
@@ -105,7 +106,8 @@ This is a **preview only**. NEAR Intents runs on mainnet, and ClearPool is on te
 
 | Item | Meaning |
 |---|---|
-| deposits | All deposits ever made |
+| Live pool · X NEAR | The pool for the size you picked (or your note's size on Withdraw) |
+| deposits | All deposits ever made in that pool |
 | approved | Deposits in the approved set, which is your crowd to hide in |
 | withdrawn | Private withdrawals plus refunds |
 | Green dot | Approved deposit |
@@ -122,13 +124,13 @@ This is a **preview only**. NEAR Intents runs on mainnet, and ClearPool is on te
 |---|---|
 | Page slow to load the first time | The free server is waking up. Wait up to a minute |
 | "I can't find this deposit in the pool yet" | You just deposited. Wait a few seconds and it appears |
-| "That doesn't look like a ClearPool note" | Paste the whole note, starting `clearpool-1near-` |
+| "That doesn't look like a ClearPool note" | Paste the whole note, starting `clearpool-` and the size, e.g. `clearpool-0.5near-` |
 | "note already spent" | That note has already been withdrawn. Each note works once |
 | "Not in the approved set" | The deposit came from a flagged wallet. Use **Return to sender** |
 | "Slow down a little" | You hit the demo limit (12 deposits an hour). Try again later |
 | "The flagged demo wallet is out of test funds" | The demo flagged wallet is empty. Try again later |
 | "Not enough testnet NEAR" | Get free test NEAR at https://near-faucet.io |
-| "You cancelled in the wallet" | Nothing was sent. Click **Deposit 1 NEAR** again |
+| "You cancelled in the wallet" | Nothing was sent. Click **Deposit** again |
 | "Connect …, the wallet that made this deposit" | Refunds go only to the depositor; connect that wallet |
 | Proof step is slow on a phone | Older phones take longer. Leave the page open until it finishes |
 
@@ -156,14 +158,14 @@ All endpoints are on `https://clearpool.onrender.com`.
 
 | Method | Path | Body / query | Returns |
 |---|---|---|---|
-| GET | `/api/state` | none | Contract stats, pool leaves, approved leaves, deposit list (approved/flagged), agent status |
-| POST | `/api/demo/deposit` | `{ commitment, flagged? }` | `{ tx, index, from }` (deposit from a demo wallet) |
-| POST | `/api/relay` | `{ proof, root, asp_root, nullifier_hash, recipient }` | `{ tx, recipient }` |
-| POST | `/api/demo/ragequit` | `{ nullifier, secret }` | `{ tx, to }` (flagged demo wallet only) |
+| GET | `/api/state` | `?pool=0.1\|0.5\|1\|5` (default 1) | Contract stats, pool leaves, approved leaves, deposit list (approved/flagged), agent status |
+| POST | `/api/demo/deposit` | `{ pool, commitment, flagged? }` | `{ tx, index, from }` (deposit from a demo wallet) |
+| POST | `/api/relay` | `{ pool, proof, root, asp_root, nullifier_hash, recipient }` | `{ tx, recipient }` |
+| POST | `/api/demo/ragequit` | `{ pool, nullifier, secret }` | `{ tx, to }` (flagged demo wallet only) |
 | GET | `/api/attestation` | `?nonce=<64 hex>` | Verified enclave checks and signing address |
 | POST | `/api/agent` | `{ question, context }` | `{ text, signed: { ok, signer, kind } }` |
-| GET | `/api/quote` | `?to=zec\|usdc-base\|sol` | Dry NEAR Intents quote for 1 NEAR |
-| GET | `/healthz` | none | `{ ok, contract, deposits }` |
+| GET | `/api/quote` | `?to=zec\|usdc-base\|sol&pool=` | Dry NEAR Intents quote for the pool size |
+| GET | `/healthz` | none | `{ ok, pools }` (deposit count per pool) |
 
 Proof inputs and the note format are in `lib/core.js`. The full scripted flow is in `scripts/e2e.js`:
 

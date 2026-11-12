@@ -1,17 +1,18 @@
+// Usage: node scripts/e2e-wallet.js <base> <account.testnet> [pool=0.1|0.5|1|5]
 // "Normal user" flow: a user's own testnet account deposits by signing the same tx the wallet sends,
 // then withdraws privately through the relayer, then a second deposit is refunded with ragequit by the same account.
 import * as C from "../lib/core.js";
 import * as snarkjs from "snarkjs";
 import { KeyPair } from "near-api-js";
 import { account, provider, NEAR } from "../lib/near.js";
-const [B, USER] = [process.argv[2] || "http://localhost:8090", process.argv[3]];
-const j = async (p, b) => { const r = await fetch(B + p, b ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) } : {}); const x = await r.json(); if (!r.ok) throw new Error(x.error); return x; };
+const [B, USER, POOL] = [process.argv[2] || "http://localhost:8090", process.argv[3], process.argv[4] || "1"];
+const j = async (p, b) => { if (b) b = { pool: POOL, ...b }; else p += (p.includes("?") ? "&" : "?") + "pool=" + POOL; const r = await fetch(B + p, b ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) } : {}); const x = await r.json(); if (!r.ok) throw new Error(x.error); return x; };
 await C.init();
 const st0 = await j("/api/state"), CONTRACT = st0.contract, me = account(USER);
 const bal = async id => Number(BigInt((await provider.viewAccount({ accountId: id })).amount)) / 1e24;
-const deposit = async n => (await me.callFunctionRaw({ contractId: CONTRACT, methodName: "deposit", args: { commitment: n.commitment.toString() }, gas: 100n * 10n ** 12n, deposit: NEAR(1) })).transaction.hash;
+const deposit = async n => (await me.callFunctionRaw({ contractId: CONTRACT, methodName: "deposit", args: { commitment: n.commitment.toString() }, gas: 100n * 10n ** 12n, deposit: NEAR(Number(POOL)) })).transaction.hash;
 const waitApproved = async c => { for (let i = 0; i < 15; i++) { const s = await j("/api/state"); if (s.approvedLeaves.includes(c)) return s; await new Promise(r => setTimeout(r, 3000)); } throw new Error("not approved in time"); };
-console.log("user", USER, "balance", (await bal(USER)).toFixed(3));
+console.log("pool", POOL, "NEAR · user", USER, "balance", (await bal(USER)).toFixed(3));
 const note = C.makeNote();
 console.log("1 wallet deposit tx", await deposit(note));
 const st = await waitApproved(note.commitment.toString());
@@ -26,6 +27,6 @@ const n2 = C.makeNote();
 console.log("4 second deposit tx", await deposit(n2));
 await waitApproved(n2.commitment.toString());
 const before = await bal(USER);
-const rq = await me.callFunctionRaw({ contractId: CONTRACT, methodName: "ragequit", args: { nullifier: n2.nullifier.toString(), secret: n2.secret.toString() }, gas: 100n * 10n ** 12n, deposit: 0n });
+const rq = await me.callFunctionRaw({ contractId: CONTRACT, methodName: "ragequit", args: { nullifier: n2.nullifier.toString(), secret: n2.secret.toString() }, gas: 100n * 10n ** 12n, deposit: 0n, waitUntil: "FINAL" });
 console.log("5 ragequit by depositor tx", rq.transaction.hash, "balance change", (await bal(USER) - before).toFixed(3));
 process.exit(0);

@@ -3,8 +3,8 @@ import * as C from "../lib/core.js";
 import * as snarkjs from "snarkjs";
 import { KeyPair } from "near-api-js";
 import { provider } from "../lib/near.js";
-const B = process.argv[2] || "http://localhost:8091";
-const j = async (p, b) => { const r = await fetch(B + p, b ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) } : {}); const x = await r.json(); if (!r.ok) throw Object.assign(new Error(x.error), { body: x }); return x; };
+const B = process.argv[2] || "http://localhost:8091", POOL = process.argv[3] || "1"; // usage: node scripts/e2e.js <base> [pool]
+const j = async (p, b) => { if (b) b = { pool: POOL, ...b }; else if (p.startsWith("/api/state")) p += "?pool=" + POOL; const r = await fetch(B + p, b ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) } : {}); const x = await r.json(); if (!r.ok) throw Object.assign(new Error(x.error), { body: x }); return x; };
 await C.init();
 const prove = async (note, pool, asp, to) => {
   const input = await C.witnessInput(note, pool, asp, to);

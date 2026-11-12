@@ -51,7 +51,9 @@ h1 .g { color: var(--green); }
 .tab { border: 0; background: none; padding: 9px 20px; border-radius: var(--r-pill); font-weight: 700; font-size: 14.5px; color: var(--muted); cursor: pointer; }
 .tab.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(14,21,18,.1); }
 
+.amount-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .amount { display: flex; align-items: baseline; gap: 10px; }
+.sizes .segb { min-width: 46px; }
 .amount .big { font-size: 72px; font-weight: 800; letter-spacing: -.04em; line-height: 1; }
 .amount .unit { font-size: 22px; font-weight: 800; color: var(--muted); }
 .hint { color: var(--muted); font-size: 14.5px; margin: 8px 0 20px; }

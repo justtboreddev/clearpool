@@ -21,7 +21,7 @@
   <section class="hero">
     <p class="eyebrow"><span class="dot"></span>Privacy pool on NEAR</p>
     <h1>Send privately.<br><span class="g">Stay clean.</span></h1>
-    <p class="lede">Deposit 1 NEAR, withdraw to a fresh address. Only approved funds can leave privately.</p>
+    <p class="lede">Deposit, then withdraw to a fresh address. Only approved funds can leave privately.</p>
   </section>
 
   <section class="grid">
@@ -40,7 +40,15 @@
 
       <!-- DEPOSIT -->
       <div class="pane" id="pane-deposit">
-        <div class="amount"><span class="big">1</span><span class="unit">NEAR</span></div>
+        <div class="amount-row">
+          <div class="amount"><span class="big" id="amtBig">1</span><span class="unit">NEAR</span></div>
+          <div class="seg sizes" role="group" aria-label="Amount">
+            <button class="segb" data-size="0.1" type="button">0.1</button>
+            <button class="segb" data-size="0.5" type="button">0.5</button>
+            <button class="segb on" data-size="1" type="button">1</button>
+            <button class="segb" data-size="5" type="button">5</button>
+          </div>
+        </div>
         <p class="hint" id="fromHint">No wallet needed. Your note is created in this browser.</p>
         <button class="btn primary" id="depositBtn" type="button">Deposit 1 NEAR <span class="arr">→</span></button>
         <label class="switch" id="flaggedRow"><input type="checkbox" id="flaggedToggle"><span></span>Send from a flagged wallet (demo)</label>
@@ -96,13 +104,13 @@
             <button class="segb" data-chain="sol" type="button">SOL</button>
           </div>
           <p class="quote" id="quoteText">…</p>
-          <p class="muted small">Live NEAR Intents quote for 1 NEAR (preview only, mainnet pricing).</p>
+          <p class="muted small">Live NEAR Intents quote for <span class="poolAmt">1</span> NEAR (preview only, mainnet pricing).</p>
         </details>
       </div>
     </div>
 
     <aside class="card side">
-      <p class="eyebrow"><span class="dot"></span>Live pool</p>
+      <p class="eyebrow"><span class="dot"></span>Live pool · <span class="poolAmt">1</span> NEAR</p>
       <div class="stats">
         <div><b id="sDeposits">–</b><span>deposits</span></div>
         <div><b id="sApproved">–</b><span>approved</span></div>
