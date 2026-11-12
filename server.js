@@ -267,4 +267,11 @@ app.get("/api/quote", async (req, res) => {
 app.get("/healthz", (req, res) => res.json({ ok: true, contract: CONTRACT, deposits: deposits.length }));
 
 app.listen(PORT, () => log(`ClearPool on :${PORT} contract ${CONTRACT}`));
+
+// Keep the free Render instance awake: ping our own public URL every 10 min
+// (Render sleeps after 15 min without inbound traffic). RENDER_EXTERNAL_URL is set by Render.
+if (process.env.RENDER_EXTERNAL_URL) {
+  const self = process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "") + "/healthz";
+  setInterval(() => fetch(self).catch(() => {}), 10 * 60 * 1000).unref();
+}
 seed().catch(e => log("seed error", e.message));
